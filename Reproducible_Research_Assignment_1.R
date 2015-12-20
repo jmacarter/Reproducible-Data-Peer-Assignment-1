@@ -1,0 +1,123 @@
+##   Coursera Reproducible Research
+##   Peer Assignment 1
+
+##   Load and preprocess the data
+##   Make a working directory for this assignment, if not present
+if (!file.exists("./Reproducible_Research_Assignment_1"))
+{
+     dir.create("./Reproducible_Research_Assignment_1")
+}
+
+##   Make a directory for the graphs created from this assignment, if not present
+if (!file.exists("./Reproducible_Research_Assignment_1/graphs"))
+{
+     dir.create("./Reproducible_Research_Assignment_1/graphs")
+}
+
+##   Make a data directory for the zip file and .csv for this assignment, if not present
+if (!file.exists("./Reproducible_Research_Assignment_1/data"))
+{
+     dir.create("./Reproducible_Research_Assignment_1/data")
+}
+
+##   Download the zip file, if necessary, and record the download date
+if (!file.exists("./Reproducible_Research_Assignment_1/data/data.zip"))
+{
+        URL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+        download.file(URL,"./Reproducible_Research_Assignment_1/data/Reproducible_Research_Assignment_1_data.zip", mode = "wb")
+        
+        ## record the download date, as mentioned in lectures
+        DownloadDate <- date()
+        sink("./Reproducible_Research_Assignment_1/data/download_date.txt")
+        cat("Date data downloaded: ")
+        cat(DownloadDate)
+        sink()
+}
+
+##   Unzip and read the activity data file
+activity <- read.csv(unz("./Reproducible_Research_Assignment_1/data/Reproducible_Research_Assignment_1_data.zip","activity.csv"))
+
+##   Set the working directory
+setwd("./Reproducible_Research_Assignment_1")
+
+
+
+##   Aggregate the data, then calculate the sums for the steps.
+sumAgg <- aggregate(steps ~ date ,data = activity, sum)
+hist(sumAgg$steps, main="Histogram of Total Daily Steps", xlab = "Total Steps")
+
+##   Add the mean and median to the histogram
+meanAgg <- mean(sumAgg$steps)
+medianAgg <- median(sumAgg$steps)
+
+abline(v = meanAgg, col = "red")
+points(meanAgg, 1, col = "red", pch = 3)
+meantext <- paste('mean    =', as.character(trunc(meanAgg)))
+text(meanAgg,1, meantext, pos = 4, col = "red")
+points(medianAgg, 3, col = "red", pch = 4)
+mediantext <- paste('median =', as.character(trunc(medianAgg)))
+text(medianAgg,3, mediantext, pos = 4, col = "red")
+dev.copy(png, file= "./graphs/histogram_of_total_daily_steps.png")
+dev.off()
+
+
+##   Create a graph of average steps in each interval.
+aveInt <- aggregate(steps ~ interval ,data = activity, mean)
+maxInt <- aveInt$interval[which.max(aveInt$steps)]
+plot(aveInt$interval,aveInt$steps, type = "l", xlab = "Hour-Minute Time Interval", ylab = "Average Number of Steps")
+
+##   Add the max steps interval to the plot
+abline(v = maxInt, col = "red")
+text(maxInt, 0, as.character(maxInt), col = "red")
+
+##   The interval format is HHHMM. For step index, convert intervals to row numbers
+rowNum <- 12*trunc(maxInt/100) + (maxInt %% 100)/5 + 1
+text(maxInt, aveInt$steps[rowNum], as.character(trunc(aveInt$step[rowNum])), pos = 2, col = "red", srt = 90)
+dev.copy(png, file= "../graphs/average_steps_per_interval.png")
+dev.off()
+
+##   Address the missing data from NAs
+##   NA = total number of steps - number of complete cases
+naTotal <- length(activity$steps) - sum(complete.cases(activity$steps))
+##   Replace all NAs with the interval average
+aveSteps <- aveInt$steps
+actSteps <- activity
+actSteps$steps[is.na(actSteps$steps)] <- aveSteps
+
+##   Aggregate the filled-in data to calculate the sums for the steps.
+sumCalc <- aggregate(steps ~ date ,data = actSteps, sum)
+meanCalc <- mean(sumCalc$steps)
+medianCalc <- median(sumCalc$steps)
+hist(sumCalc$steps, main="Histogram of Imputed Total Daily Steps", xlab = "Total Steps")
+##   Add the mean and median to the filled-in histogram
+abline(v = meanCalc, col = "red")
+points(meanCalc, 1, col = "red", pch = 3)
+meantext <- paste('mean    =', as.character(trunc(meanCalc)))
+text(meanCalc,1, meantext, pos = 4, col = "red")
+points(medianCalc, 3, col = "red", pch = 4)
+mediantext <- paste('median =', as.character(trunc(medianCalc)))
+text(medianCalc,3, mediantext, pos = 4, col = "red")
+dev.copy(png, file= "./graphs/histogram_of_imputed_total_daily_steps.png")
+dev.off()
+
+
+##   test for weekday/weekend factor creation
+dateAsDate <- as.Date(activity$date, format = "%Y-%m-%d")
+daylist <- weekdays(dateAsDate,abbreviate = TRUE)
+daylist[daylist %in% c("Sat","Sun")] <- "weekend"
+daylist[daylist != "weekend"] <- "weekday"
+activeWeek <- cbind(actSteps,daylist)
+##   calculate averages for weekday and weekend intervals
+stepsAveInt <- aggregate(activeWeek, by=list(activeWeek$interval,activeWeek$daylist),FUN="mean")
+
+install.packages("lattice")
+library("lattice")
+
+stepsAveInt <- aggregate(activeWeek, by=list(activeWeek$interval,activeWeek$daylist),FUN="mean")
+names(stepsAveInt)[1] <- "Interval"
+names(stepsAveInt)[2] <- "dayType"
+xyplot(steps ~ interval | dayType, data = stepsAveInt, layout = c(1,2), type = "l", xlab = "Interval", ylab = "Number of Steps")
+dev.copy(png, file= "./graphs/average_steps_by_part_of_week.png")
+dev.off()
+
+
